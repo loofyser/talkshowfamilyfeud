@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Family Feud Game</title>
+<style>
+    body { margin: 0; overflow: hidden; background: #000; font-family: Arial, sans-serif; }
+    
+    #setup { background: #fff; color: #000; font-family: monospace; padding: 10px; position: absolute; z-index: 999; width: 100%; height: 100%; overflow: auto; }
+    
+    #game {
+        display: none;
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    #bg-video {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        min-width: 100%;
+        min-height: 100%;
+        width: auto;
+        height: auto;
+        z-index: -1;
+        object-fit: cover;
+    }
+
+    /* X marks for incorrect answers */
+    .x-mark-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5vw;
+        z-index: 2000;
+        width: 100vw;
+        pointer-events: none;
+    }
+
+    .x-mark {
+        width: 25vw;
+        height: 25vw;
+        max-width: 400px;
+        max-height: 400px;
+        background-image: url('x_mark.png');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        display: none;
+    }
+
+    .x-mark.active {
+        display: block;
+    }
+
+    .box {
+        position: absolute;
+        width: clamp(400px, 27.6vw, 600px);
+        height: clamp(75px, 5.2vw, 113px);
+        perspective: 1000px;
+    }
+
+    #box-1 { top: 33%; left: 21.5%; }
+    #box-2 { top: 46.5%; left: 21.5%; }
+    #box-3 { top: 59.75%; left: 21.5%; }
+    #box-4 { top: 73%; left: 21.5%; }
+    #box-5 { top: 85%; left: 21.5%; }
+    #box-6 { top: 33%; left: 50.5%; }
+    #box-7 { top: 46.5%; left: 50.5%; }
+    #box-8 { top: 59.75%; left: 50.5%; }
+    #box-9 { top: 73%; left: 50.5%; }
+    #box-10 { top: 85%; left: 50.5%; }
+
+    .inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        transition: transform 0.6s;
+        transform-style: preserve-3d;
+    }
+
+    .flipped .inner { transform: rotateX(-180deg); }
+
+    .front, .back {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        backface-visibility: hidden;
+        background: url('Rectangle.svg') no-repeat center center;
+        background-size: 100% 100%;
+        display: flex;
+        align-items: center;
+        color: white;
+        font-weight: bold;
+        text-shadow: 2px 2px 2px #000;
+    }
+
+    .front {
+        justify-content: center;
+        font-size: clamp(24px, 2.5vw, 40px);
+        color: #002e5d;
+        text-shadow: none;
+    }
+    
+    .front span {
+        background: #daeaf3;
+        width: fit-content;
+        padding: 0 15px;
+        height: 35px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 17.5px;
+        border: 2px solid #002e5d;
+        box-sizing: border-box;
+    }
+
+    .back {
+        transform: rotateX(180deg);
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        padding: 0 15%;
+        box-sizing: border-box;
+        font-size: clamp(16px, 1.5vw, 24px);
+        text-transform: uppercase;
+        overflow: hidden;
+        gap: 15px;
+    }
+
+    .back span:first-child {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: left;
+    }
+
+    .count {
+        border-left: 2px solid rgba(255,255,255,0.5);
+        padding-left: 15px;
+        text-align: right;
+        min-width: 50px;
+    }
+
+    #score-display {
+        position: absolute;
+        top: 2.5%;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: calc(5vw + 50px);
+        color: #fff;
+        text-shadow: 4px 4px 0 #002e5d, -4px -4px 0 #002e5d, 4px -4px 0 #002e5d, -4px 4px 0 #002e5d;
+        font-weight: 600;
+        z-index: 1000;
+        font-family: 'Arial Black', sans-serif;
+        letter-spacing: 1px;
+        text-align: center;
+        white-space: nowrap;
+        padding: 10px 30px;
+        text-transform: uppercase;
+    }
+
+    .team-score {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: calc(3vw + 30px);
+        color: #fff;
+        text-shadow: 3px 3px 0 #002e5d, -3px -3px 0 #002e5d, 3px -3px 0 #002e5d, -3px 3px 0 #002e5d;
+        font-weight: 600;
+        z-index: 1000;
+        font-family: 'Arial Black', sans-serif;
+        background: rgba(0, 46, 93, 0.7);
+        padding: 10px 20px;
+        border-radius: 10px;
+        min-width: 100px;
+        text-align: center;
+    }
+
+    #team1-score { left: 2%; }
+    #team2-score { right: 2%; }
+
+    #setup input, #setup select, #setup button {
+        font-family: monospace;
+        font-size: 12px;
+    }
+
+    @media (max-width: 768px) {
+        .box {
+            width: clamp(300px, 80vw, 400px);
+            height: clamp(60px, 15vw, 75px);
+        }
+        #box-1, #box-2, #box-3, #box-4, #box-5, #box-6, #box-7, #box-8, #box-9, #box-10 {
+            left: 10% !important;
+        }
+        .x-mark-container {
+            gap: 10px;
+        }
+        .x-mark {
+            width: 80px;
+            height: 80px;
+        }
+    }
+
+    .buzzer-light {
+        position: absolute;
+        top: 0;
+        width: 50%;
+        height: 100%;
+        z-index: 500;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.1s ease;
+    }
+
+    #buzzer-light-left {
+        left: 0;
+        background: linear-gradient(to right, rgba(255, 215, 0, 0.4), transparent);
+    }
+
+    #buzzer-light-right {
+        right: 0;
+        background: linear-gradient(to left, rgba(255, 215, 0, 0.4), transparent);
+    }
+
+    .buzzer-light.active {
+        opacity: 1;
+    }
+
+</style>
+</head>
+<body>
+
+
+<div id="setup">
+    EP: <select id="episode-select" onchange="updateQuestionDropdown()"><option value="">--</option></select>
+    Q: <select id="question-select" onchange="loadSelectedQuestion()"><option value="">--</option></select>
+    <div id="inputs-container"></div>
+    <button type="button" onclick="go()">START</button>
+</div>
+
+<div id="game">
+    <video id="bg-video" muted loop playsinline>
+        <source src="Comp 1_2.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    <div id="buzzer-light-left" class="buzzer-light"></div>
+    <div id="buzzer-light-right" class="buzzer-light"></div>
+    <div id="score-display">0</div>
+    <div id="team1-score" class="team-score">0</div>
+    <div id="team2-score" class="team-score">0</div>
+    <div id="x-mark-container" class="x-mark-container">
+        <div id="x-mark-1" class="x-mark"></div>
+        <div id="x-mark-2" class="x-mark"></div>
+        <div id="x-mark-3" class="x-mark"></div>
+    </div>
+</div>
+
+<script>
+    const episodesData = {
+        "Episode 1": [
+            {
+                question: "Name something people forget when they leave the house",
+                answers: [
+                    { text: "Keys", score: 50 },
+                    { text: "Phone", score: 25 },
+                    { text: "Wallet", score: 15 },
+                    { text: "Sunglasses", score: 10 }
+                ]
+            },
+            {
+                question: "Name a place where people often lose their keys",
+                answers: [
+                    { text: "At home", score: 55 },
+                    { text: "At the mall", score: 17 },
+                    { text: "In a purse", score: 10 },
+                    { text: "In the car", score: 7 },
+                    { text: "At a bar", score: 6 }
+                ]
+            },
+            {
+                question: "Name a place teens complain about going to",
+                answers: [
+                    { text: "School/College", score: 56 },
+                    { text: "Church", score: 26 },
+                    { text: "Family events", score: 9 },
+                    { text: "Doctor/Dentist", score: 4 },
+                    { text: "Grocery store", score: 2 },
+                    { text: "Work", score: 2 }
+                ]
+            },
+            {
+                question: "Name something people often do before a big presentation",
+                answers: [
+                    { text: "Practice", score: 34 },
+                    { text: "Panic", score: 21 },
+                    { text: "Drink water", score: 18 },
+                    { text: "Check notes", score: 15 },
+                    { text: "Go to the bathroom", score: 12 }
+                ]
+            },
+            {
+                question: "Name something people say they never have enough of",
+                answers: [
+                    { text: "Money", score: 39 },
+                    { text: "Time", score: 27 },
+                    { text: "Sleep", score: 17 },
+                    { text: "Energy", score: 10 },
+                    { text: "Vacation days", score: 7 }
+                ]
+            }
+        ],
+        "Episode 2": [
+            {
+                question: "Name a common fear",
+                answers: [
+                    { text: "Heights", score: 50 },
+                    { text: "Spiders", score: 25 },
+                    { text: "Public Speaking", score: 15 },
+                    { text: "Flying", score: 10 }
+                ]
+            },
+            {
+                question: "Name something you keep in your car",
+                answers: [
+                    { text: "Money/Coins", score: 19 },
+                    { text: "Food/Water", score: 18 },
+                    { text: "First Aid Kit", score: 18 },
+                    { text: "Spare Tire", score: 15 },
+                    { text: "Jumper Cables", score: 7 },
+                    { text: "Clothes/Shoes", score: 5 }
+                ]
+            },
+            {
+                question: "An activity that’s easier when it’s windy",
+                answers: [
+                    { text: "Flying a Kite", score: 89 },
+                    { text: "Sailing", score: 7 },
+                    { text: "Surfing", score: 2 },
+                    { text: "Air-Drying Clothes", score: 2 }
+                ]
+            },
+            {
+                question: "A job that starts with “J”",
+                answers: [
+                    { text: "Janitor", score: 62 },
+                    { text: "Judge", score: 19 },
+                    { text: "Jeweler", score: 5 },
+                    { text: "Journalist", score: 4 }
+                ]
+            },
+            {
+                question: "A reason why people check their phones in the middle of the night",
+                answers: [
+                    { text: "Message alert", score: 34 },
+                    { text: "Social media", score: 22 },
+                    { text: "Alarm", score: 18 },
+                    { text: "Can’t sleep", score: 16 },
+                    { text: "Missed call", score: 10 }
+                ]
+            }
+        ],
+        "Episode 3": [
+            {
+                question: "Name something people usually only do once a week",
+                answers: [
+                    { text: "Laundry", score: 27 },
+                    { text: "Grocery shopping", score: 25 },
+                    { text: "Exercise", score: 21 },
+                    { text: "Go to church", score: 15 },
+                    { text: "Mow the lawn", score: 12 }
+                ]
+            },
+            {
+                question: "Name something that has teeth",
+                answers: [
+                    { text: "Animals", score: 66 },
+                    { text: "People", score: 19 },
+                    { text: "A Comb", score: 8 },
+                    { text: "Zipper", score: 4 }
+                ]
+            },
+            {
+                question: "What’s the first thing you clean before friends come over?",
+                answers: [
+                    { text: "Bathroom", score: 59 },
+                    { text: "Kitchen", score: 18 },
+                    { text: "Floors/carpets", score: 11 },
+                    { text: "Living room", score: 3 },
+                    { text: "Yourself", score: 3 }
+                ]
+            },
+            {
+                question: "Which monster could beat Dracula in a fight?",
+                answers: [
+                    { text: "Godzilla", score: 43 },
+                    { text: "Frankenstein", score: 26 },
+                    { text: "King Kong", score: 13 },
+                    { text: "Werewolf", score: 10 },
+                    { text: "Freddy Krueger", score: 5 },
+                    { text: "Jason", score: 2 }
+                ]
+            },
+            {
+                question: "Name something people describe as a “dead end.”",
+                answers: [
+                    { text: "A road", score: 47 },
+                    { text: "A job", score: 28 },
+                    { text: "An argument", score: 5 },
+                    { text: "A lead", score: 2 },
+                    { text: "Hair", score: 2 }
+                ]
+            }
+        ],
+        "Episode 4": [
+            {
+                question: "What’s your favorite thing to do at a party?",
+                answers: [
+                    { text: "Dance", score: 45 },
+                    { text: "Talk/socialize", score: 21 },
+                    { text: "Drink", score: 18 },
+                    { text: "Eat", score: 8 },
+                    { text: "Sing karaoke", score: 6 }
+                ]
+            },
+            {
+                question: "What’s something you did every day in kindergarten that you wish you could still do now?",
+                answers: [
+                    { text: "Take a nap", score: 64 },
+                    { text: "Play with toys or enjoy recess", score: 19 },
+                    { text: "Color or paint", score: 12 },
+                    { text: "Get free snacks", score: 4 }
+                ]
+            },
+            {
+                question: "When do parents make kids wear special clothes?",
+                answers: [
+                    { text: "At a wedding", score: 26 },
+                    { text: "On Easter", score: 23 },
+                    { text: "For Halloween", score: 20 },
+                    { text: "To church", score: 15 },
+                    { text: "On Christmas", score: 4 },
+                    { text: "For school pictures", score: 4 }
+                ]
+            },
+            {
+                question: "What’s a word that dogs understand?",
+                answers: [
+                    { text: "Sit", score: 54 },
+                    { text: "Walk", score: 6 },
+                    { text: "Food", score: 6 },
+                    { text: "Their name", score: 5 },
+                    { text: "Stay", score: 4 },
+                    { text: "Fetch", score: 3 },
+                    { text: "Treat", score: 2 }
+                ]
+            },
+            {
+                question: "What do kids love jumping on?",
+                answers: [
+                    { text: "The bed", score: 71 },
+                    { text: "A trampoline", score: 20 },
+                    { text: "The couch", score: 5 },
+                    { text: "A pile of leaves", score: 3 }
+                ]
+            }
+        ],
+        "Episode 5": [
+            {
+                question: "Name an animal that’s easy to act out in charades",
+                answers: [
+                    { text: "Monkey/Ape", score: 32 },
+                    { text: "Dog", score: 21 },
+                    { text: "Cat", score: 16 },
+                    { text: "Bird", score: 14 },
+                    { text: "Elephant", score: 4 }
+                ]
+            },
+            {
+                question: "Give a word that rhymes with “hustle”",
+                answers: [
+                    { text: "Bustle", score: 73 },
+                    { text: "Muscle", score: 15 },
+                    { text: "Rustle", score: 9 },
+                    { text: "Tussle", score: 3 }
+                ]
+            },
+            {
+                question: "Name something you see at a breakfast buffet",
+                answers: [
+                    { text: "Eggs", score: 25 },
+                    { text: "Bacon", score: 24 },
+                    { text: "Sausage", score: 19 },
+                    { text: "Potatoes/Hash Browns", score: 12 },
+                    { text: "Juice", score: 7 }
+                ]
+            },
+            {
+                question: "Name a soda that people like to drink",
+                answers: [
+                    { text: "Coca-Cola", score: 39 },
+                    { text: "Diet Coke", score: 29 },
+                    { text: "Pepsi", score: 14 },
+                    { text: "Dr. Pepper", score: 11 }
+                ]
+            },
+            {
+                question: "Give a three-letter word that starts with “Z.”",
+                answers: [
+                    { text: "Zoo", score: 40 },
+                    { text: "Zip", score: 18 },
+                    { text: "Zap", score: 15 },
+                    { text: "Zen", score: 13 },
+                    { text: "Zit", score: 13 }
+                ]
+            }
+        ]
+    };
+
+    let totalScore = 0;
+    let team1Score = 0;
+    let team2Score = 0;
+    let lastRTime = 0;
+    let lastQTime = 0;
+    let lastLeftTime = 0;
+    let lastRightTime = 0;
+    let incorrectCount = 0;
+    const MAX_INCORRECT = 3;
+    const INCORRECT_TIMEOUT = 3000; // 3 seconds
+    const DOUBLE_TAP_DELAY = 300;
+    let xHideTimeout = null;
+    let undoStack = [];
+
+    const sounds = {
+        correct: new Audio('correct.mp3'),
+        incorrect: new Audio('incorrect.mp3'),
+        buzzer: new Audio('BuzzInSound.mp3')
+    };
+
+    function playSound(name) {
+        const sound = sounds[name].cloneNode();
+        sound.play().catch(e => console.log("Audio play failed:", e));
+    }
+
+    function init() {
+        const episodeSelect = document.getElementById('episode-select');
+        for (const ep in episodesData) {
+            const opt = document.createElement('option');
+            opt.value = ep;
+            opt.textContent = ep.replace("Episode ", "");
+            episodeSelect.appendChild(opt);
+        }
+
+        const container = document.getElementById('inputs-container');
+        for (let i = 1; i <= 10; i++) {
+            const div = document.createElement('div');
+            div.innerHTML = `${i}:<input id="a${i}" type="text" style="width:120px"><input id="s${i}" type="number" style="width:40px">`;
+            container.appendChild(div);
+        }
+    }
+
+    function updateQuestionDropdown() {
+        const ep = document.getElementById('episode-select').value;
+        const qSelect = document.getElementById('question-select');
+        qSelect.innerHTML = '<option value="">--</option>';
+        if (ep && episodesData[ep]) {
+            episodesData[ep].forEach((q, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.textContent = index + 1;
+                qSelect.appendChild(opt);
+            });
+        }
+    }
+
+    function loadSelectedQuestion() {
+        const ep = document.getElementById('episode-select').value;
+        const qIndex = document.getElementById('question-select').value;
+        for (let i = 1; i <= 10; i++) {
+            document.getElementById('a' + i).value = '';
+            document.getElementById('s' + i).value = '';
+        }
+        if (ep && qIndex !== "" && episodesData[ep][qIndex]) {
+            episodesData[ep][qIndex].answers.forEach((ans, i) => {
+                if (i < 10) {
+                    document.getElementById('a' + (i + 1)).value = ans.text;
+                    document.getElementById('s' + (i + 1)).value = ans.score;
+                }
+            });
+        }
+    }
+
+    function saveState() {
+        const state = {
+            totalScore,
+            team1Score,
+            team2Score,
+            incorrectCount,
+            flippedBoxes: Array.from(document.querySelectorAll('.box')).map(box => ({
+                id: box.id,
+                flipped: box.classList.contains('flipped')
+            })),
+            buzzerLeft: document.getElementById('buzzer-light-left').classList.contains('active'),
+            buzzerRight: document.getElementById('buzzer-light-right').classList.contains('active')
+        };
+        undoStack.push(JSON.stringify(state));
+        if (undoStack.length > 50) undoStack.shift();
+    }
+
+    function undo() {
+        if (undoStack.length === 0) return;
+        const state = JSON.parse(undoStack.pop());
+        totalScore = state.totalScore;
+        team1Score = state.team1Score;
+        team2Score = state.team2Score;
+        incorrectCount = state.incorrectCount;
+        
+        state.flippedBoxes.forEach(b => {
+            const box = document.getElementById(b.id);
+            if (box) {
+                if (b.flipped) box.classList.add('flipped');
+                else box.classList.remove('flipped');
+            }
+        });
+
+        // Sync Buzzer Lights
+        const leftLight = document.getElementById('buzzer-light-left');
+        const rightLight = document.getElementById('buzzer-light-right');
+        if (state.buzzerLeft) leftLight.classList.add('active');
+        else leftLight.classList.remove('active');
+        if (state.buzzerRight) rightLight.classList.add('active');
+        else rightLight.classList.remove('active');
+
+        // Sync X marks
+        for (let i = 1; i <= MAX_INCORRECT; i++) {
+            const xMark = document.getElementById(`x-mark-${i}`);
+            if (xMark) {
+                if (i <= incorrectCount) xMark.classList.add('active');
+                else xMark.classList.remove('active');
+            }
+        }
+
+        updateScoreDisplay();
+    }
+
+    function go() {
+        const game = document.getElementById('game');
+        game.querySelectorAll('.box').forEach(b => b.remove());
+        totalScore = 0;
+        team1Score = 0;
+        team2Score = 0;
+        undoStack = [];
+        updateScoreDisplay();
+        resetIncorrect();
+        for(let i=1; i<=10; i++) {
+            let ans = document.getElementById('a'+i).value;
+            let score = parseInt(document.getElementById('s'+i).value) || 0;
+            if(ans) {
+                let div = document.createElement('div');
+                div.className = 'box';
+                div.id = 'box-' + i;
+                div.dataset.score = score;
+                div.innerHTML = `<div class="inner" id="inner-${i}"><div class="front"><span>${i}</span></div><div class="back"><span>${ans}</span><span class="count">${score}</span></div></div>`;
+                game.appendChild(div);
+            }
+        }
+        document.getElementById('setup').style.display = 'none';
+        game.style.display = 'block';
+        
+        // Start video via JS to avoid validation error
+        const video = document.getElementById('bg-video');
+        video.play().catch(e => console.log("Video play failed:", e));
+    }
+
+    function updateScoreDisplay() {
+        document.getElementById('score-display').textContent = totalScore;
+        document.getElementById('team1-score').textContent = team1Score;
+        document.getElementById('team2-score').textContent = team2Score;
+    }
+
+    function awardPoints(team) {
+        saveState();
+        if (team === 1) {
+            team1Score += totalScore;
+        } else {
+            team2Score += totalScore;
+        }
+        totalScore = 0;
+        updateScoreDisplay();
+    }
+
+    function toggleBox(num) {
+        const box = document.getElementById('box-' + num);
+        if (box) {
+            saveState();
+            const score = parseInt(box.dataset.score) || 0;
+            if (box.classList.contains('flipped')) {
+                box.classList.remove('flipped');
+                totalScore -= score;
+            } else {
+                box.classList.add('flipped');
+                totalScore += score;
+                playSound('correct');
+            }
+            updateScoreDisplay();
+        }
+    }
+
+    function resetGame() {
+        saveState();
+        document.querySelectorAll('.box').forEach(box => box.classList.remove('flipped'));
+        totalScore = 0;
+        team1Score = 0;
+        team2Score = 0;
+        updateScoreDisplay();
+    }
+
+    function backToConfig() {
+        document.getElementById('game').style.display = 'none';
+        document.getElementById('setup').style.display = 'block';
+    }
+
+    function triggerBuzzer(side) {
+        saveState();
+        playSound('buzzer');
+        const leftLight = document.getElementById('buzzer-light-left');
+        const rightLight = document.getElementById('buzzer-light-right');
+        
+        // Clear both first
+        leftLight.classList.remove('active');
+        rightLight.classList.remove('active');
+        
+        if (side === 'left') {
+            leftLight.classList.add('active');
+        } else {
+            rightLight.classList.add('active');
+        }
+
+        // Auto-clear lights after 5 seconds
+        setTimeout(() => {
+            leftLight.classList.remove('active');
+            rightLight.classList.remove('active');
+        }, 5000);
+    }
+
+    function incrementIncorrect() {
+        if (incorrectCount < MAX_INCORRECT) {
+            saveState();
+            incorrectCount++;
+            playSound('incorrect');
+            
+            // Hide all first to ensure clean state
+            for (let i = 1; i <= MAX_INCORRECT; i++) {
+                document.getElementById(`x-mark-${i}`).classList.remove('active');
+            }
+
+            // Show exactly the number of Xs for the current strike
+            // Strike 1: Show 1 X (middle)
+            // Strike 2: Show 2 Xs (side by side)
+            // Strike 3: Show 3 Xs (side by side)
+            for (let i = 1; i <= incorrectCount; i++) {
+                const xMark = document.getElementById(`x-mark-${i}`);
+                if (xMark) xMark.classList.add('active');
+            }
+            
+            // Clear any existing hide timeout
+            if (xHideTimeout) clearTimeout(xHideTimeout);
+            
+            // Set timeout to hide all Xs after a few seconds
+            xHideTimeout = setTimeout(() => {
+                for (let i = 1; i <= MAX_INCORRECT; i++) {
+                    const xMark = document.getElementById(`x-mark-${i}`);
+                    if (xMark) xMark.classList.remove('active');
+                }
+                xHideTimeout = null;
+            }, INCORRECT_TIMEOUT);
+        }
+    }
+
+    function resetIncorrect() {
+        incorrectCount = 0;
+        // Clear hide timeout
+        if (xHideTimeout) {
+            clearTimeout(xHideTimeout);
+            xHideTimeout = null;
+        }
+        for (let i = 1; i <= MAX_INCORRECT; i++) {
+            const xMark = document.getElementById(`x-mark-${i}`);
+            if (xMark) {
+                xMark.classList.remove('active');
+            }
+        }
+    }
+
+    function navigateQuestion(dir) {
+        const ep = document.getElementById('episode-select').value;
+        const qSelect = document.getElementById('question-select');
+        let currentIdx = parseInt(qSelect.value);
+        
+        if (isNaN(currentIdx)) currentIdx = -1;
+        
+        let nextIdx = currentIdx + dir;
+        const maxIdx = episodesData[ep] ? episodesData[ep].length - 1 : -1;
+        
+        if (nextIdx >= 0 && nextIdx <= maxIdx) {
+            qSelect.value = nextIdx;
+            loadSelectedQuestion();
+            go();
+        }
+    }
+
+    window.addEventListener('keydown', (e) => {
+        // Prevent shortcuts when in setup
+        if (document.getElementById('setup').style.display !== 'none') return;
+
+        if (e.key >= '0' && e.key <= '9') {
+            let num = parseInt(e.key);
+            if (num === 0) num = 10;
+            toggleBox(num);
+        }
+        
+        // Numpad 1 and 2 for awarding points
+        if (e.code === 'Numpad1') {
+            awardPoints(1);
+        }
+        if (e.code === 'Numpad2') {
+            awardPoints(2);
+        }
+
+        // Ctrl+Z for Undo
+        if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            undo();
+        }
+
+        if (e.key.toLowerCase() === 'r') {
+            const now = Date.now();
+            if (now - lastRTime < DOUBLE_TAP_DELAY) {
+                resetGame();
+                resetIncorrect();
+            }
+            lastRTime = now;
+        }
+        if (e.key.toLowerCase() === 'q') {
+            const now = Date.now();
+            if (now - lastQTime < DOUBLE_TAP_DELAY) backToConfig();
+            lastQTime = now;
+        }
+        if (e.key.toLowerCase() === 'x') {
+            incrementIncorrect();
+        }
+
+        if (e.key.toLowerCase() === 'a') {
+            triggerBuzzer('left');
+        }
+        if (e.key.toLowerCase() === 's') {
+            triggerBuzzer('right');
+        }
+
+        if (e.key === 'ArrowLeft') {
+            const now = Date.now();
+            if (now - lastLeftTime < DOUBLE_TAP_DELAY) {
+                navigateQuestion(-1);
+            }
+            lastLeftTime = now;
+        }
+        if (e.key === 'ArrowRight') {
+            const now = Date.now();
+            if (now - lastRightTime < DOUBLE_TAP_DELAY) {
+                navigateQuestion(1);
+            }
+            lastRightTime = now;
+        }
+    });
+
+    init();
+</script>
+
+</body>
+</html>
